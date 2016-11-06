@@ -1,0 +1,8 @@
+[package]
+name = "bezier"
+version = "0.1.0"
+authors = ["Zihang Chen <chsc4698@gmail.com>"]
+
+[dependencies]
+glium = "*"
+nalgebra = "*"
