@@ -1,19 +1,16 @@
 use na::{Point3, Vector3};
 
-
-#[derive(Debug, Copy, Clone)]
 pub struct Vertex {
-  pos: [f64; 4],
-  norm: [f64; 4]
+  pub pos: [f32; 4],
+  pub norm: [f32; 4]
 }
-
-implement_vertex!(Vertex, pos, norm);
 
 impl Vertex {
   pub fn from_vector3(p: &Point3<f64>, n: &Vector3<f64>) -> Self {
     Vertex {
-      pos: [p.x, p.y, p.z, 1.0],
-      norm: [n.x, n.y, n.z, 0.0]
+      pos: [p.x as f32, p.y as f32, p.z as f32, 1.0],
+      norm: [n.x as f32, n.y as f32, n.z as f32, 0.0],
     }
   }
 }
+

@@ -4,5 +4,8 @@ version = "0.1.0"
 authors = ["Zihang Chen <chsc4698@gmail.com>"]
 
 [dependencies]
-glium = "*"
+gfx = "*"
+gfx_window_glutin = "*"
+gfx_app = "*"
 nalgebra = "*"
+
