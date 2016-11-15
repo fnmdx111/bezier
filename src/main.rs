@@ -39,14 +39,14 @@ gfx_defines! {
   }
 
   constant ProjectionObject {
-    ctm: [[f32; 4]; 4] = "u_ctm",
+    ctm: [[f32; 4]; 4] = "ctm",
+    persp: [[f32; 4]; 4] = "persp",
+    eye: [f32; 4] = "eye",
   }
 
   pipeline bzr {
     vbuf: gfx::VertexBuffer<GfxVertex> = (),
-    ctm: gfx::ConstantBuffer<ProjectionObject> = "u_prj",
-    persp: gfx::Global<[[f32; 4]; 4]> = "u_persp",
-    eye: gfx::Global<[f32; 4]> = "u_eye",
+    prj: gfx::ConstantBuffer<ProjectionObject> = "u_prj",
     light: gfx::ConstantBuffer<LightObject> = "u_light",
     material: gfx::ConstantBuffer<MaterialObject> = "u_material",
     out_color: gfx::RenderTarget<ColorFormat> = "Target0",
@@ -61,25 +61,21 @@ macro_rules! unpack {
   (v4 $i:expr) => ([$i.x as f32, $i.y as f32, $i.z as f32, $i.w as f32]);
 }
 
-impl From<Light> for LightObject {
-  fn from(l: Light) -> Self {
-    LightObject {
-      ambient: unpack!(v4 l.ambient),
-      diffuse: unpack!(v4 l.diffuse),
-      specular: unpack!(v4 l.specular),
-      pos: unpack!(pos l.pos)
-    }
+fn lo_from(l: &Light) -> LightObject {
+  LightObject {
+    ambient: unpack!(v4 l.ambient),
+    diffuse: unpack!(v4 l.diffuse),
+    specular: unpack!(v4 l.specular),
+    pos: unpack!(pos l.pos)
   }
 }
 
-impl From<Material> for MaterialObject {
-  fn from(m: Material) -> Self {
-    MaterialObject {
-      ambient: unpack!(v4 m.ambient),
-      diffuse: unpack!(v4 m.diffuse),
-      specular: unpack!(v4 m.specular),
-      shininess: m.shininess as f32
-    }
+fn mo_from(m: &Material) -> MaterialObject {
+  MaterialObject {
+    ambient: unpack!(v4 m.ambient),
+    diffuse: unpack!(v4 m.diffuse),
+    specular: unpack!(v4 m.specular),
+    shininess: m.shininess as f32
   }
 }
 
@@ -123,15 +119,11 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
                                              ps.select(init.backend).unwrap(),
                                              bzr::new()).unwrap();
 
-    use na::ToHomogeneous;
-
     let data = bzr::Data {
       vbuf: vbuf,
-      ctm: factory.create_constant_buffer(1),
-      persp: *(scene.camera.persp.as_ref()),
-      eye: *(scene.camera.eye.to_homogeneous().as_ref()),
-      light: factory.create_constant_buffer(1), // LightObject::from(scene.light),
-      material: factory.create_constant_buffer(1), // MaterialObject::from(scene.material),
+      prj: factory.create_constant_buffer(1),
+      light: factory.create_constant_buffer(1),
+      material: factory.create_constant_buffer(1),
       out_color: init.color,
       out_depth: init.depth
     };
@@ -142,16 +134,28 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
     }
   }
 
-  fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
+  fn render<C: gfx::CommandBuffer<R>>(&mut self,
+                                      encoder: &mut gfx::Encoder<R, C>) {
     self.scene.camera.refresh_mat();
-    encoder.update_constant_buffer(&self.bundle.data.ctm,
+
+    use na::ToHomogeneous;
+    let camera = &(self.scene.camera);
+
+    encoder.update_constant_buffer(&self.bundle.data.prj,
                                    &ProjectionObject {
-                                     ctm: *(self.scene.camera.ctm.as_ref())
+                                     ctm: *(camera.ctm.as_ref()),
+                                     persp: *(camera.persp.as_ref()),
+                                     eye: *(camera.eye.to_homogeneous()
+                                            .as_ref()),
                                    });
+    encoder.update_constant_buffer(&self.bundle.data.light,
+                                   &lo_from(&self.scene.light));
+    encoder.update_constant_buffer(&self.bundle.data.material,
+                                   &mo_from(&self.scene.material));
 
     encoder.update_buffer(&self.bundle.data.vbuf,
                           &to_gfx_vtxs(self.scene.bobj.refresh()),
-                          0);
+                          0).unwrap();
 
     encoder.clear(&self.bundle.data.out_color, [1.0, 1.0, 1.0, 1.0]);
     encoder.clear_depth(&self.bundle.data.out_depth, 1.0);

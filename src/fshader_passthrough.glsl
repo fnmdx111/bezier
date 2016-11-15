@@ -1,25 +1,32 @@
-#version 150
+#version 150 core
 
-uniform u_light {
+struct ProjectionObject {
+  mat4 ctm;
+  mat4 persp;
+  vec4 eye;
+};
+uniform ProjectionObject u_prj;
+
+struct LightObject {
   vec4 ambient;
   vec4 diffuse;
   vec4 specular;
   vec4 pos;
 };
+uniform LightObject u_light;
 
-uniform vec4 u_eye;
-
-uniform u_material {
+struct MaterialObject {
   vec4 ambient;
   vec4 diffuse;
   vec4 specular;
   float shininess;
 };
+uniform MaterialObject u_material;
 
-varying vec4 v_eye;
-varying vec4 v_lgh;
-varying vec4 n_unnormalized;
-varying vec4 v_pos;
+in vec4 v_eye;
+in vec4 v_lgh;
+in vec4 n_unnormalized;
+in vec4 v_pos;
 
 vec4 pll4(vec4 a, vec4 b)
 {
@@ -47,11 +54,11 @@ void main()
   float ddspec = dot(hlf, n);
 
   if (dddiff > 0.0) {
-    color += pll4(ldiff, mdiff1) * dddiff;
+    color += pll4(u_light.diffuse, mdiff1) * dddiff;
   }
 
   if (ddspec > 0.0) {
-    color += pll4(u_light.specular, material.specular)
+    color += pll4(u_light.specular, u_material.specular)
       * exp(u_material.shininess * log(ddspec));
   }
 
