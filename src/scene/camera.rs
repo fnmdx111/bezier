@@ -13,7 +13,7 @@ pub struct Camera {
     ymouse: i32,
     pub ctm: Matrix4<f32>,
     pub persp: Matrix4<f32>,
-    eye: Point3<f32>,
+    pub eye: Point3<f32>,
 }
 
 impl Default for Camera {

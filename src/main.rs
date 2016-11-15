@@ -38,15 +38,20 @@ gfx_defines! {
     shininess: f32 = "shininess",
   }
 
+  constant ProjectionObject {
+    ctm: [[f32; 4]; 4] = "u_ctm",
+  }
+
   pipeline bzr {
     vbuf: gfx::VertexBuffer<GfxVertex> = (),
-    ctm: gfx::Global<[[f32; 4]; 4]> = "u_ctm",
+    ctm: gfx::ConstantBuffer<ProjectionObject> = "u_prj",
     persp: gfx::Global<[[f32; 4]; 4]> = "u_persp",
     eye: gfx::Global<[f32; 4]> = "u_eye",
     light: gfx::ConstantBuffer<LightObject> = "u_light",
     material: gfx::ConstantBuffer<MaterialObject> = "u_material",
-    out_color: gfx::RenderTarget<gfx::format::Rgba8> = "Target0",
-    out_depth: gfx::DepthTarget<gfx::format::DepthStencil> = gfx::preset::depth::LESS_EQUAL_WRITE,
+    out_color: gfx::RenderTarget<ColorFormat> = "Target0",
+    out_depth: gfx::DepthTarget<DepthFormat>
+      = gfx::preset::depth::LESS_EQUAL_WRITE,
   }
 }
 
@@ -73,17 +78,15 @@ impl From<Material> for MaterialObject {
       ambient: unpack!(v4 m.ambient),
       diffuse: unpack!(v4 m.diffuse),
       specular: unpack!(v4 m.specular),
-      shininess: m.shininess
+      shininess: m.shininess as f32
     }
   }
 }
 
-impl From<Vertex> for GfxVertex {
-  fn from(v: Vertex) -> Self {
-    GfxVertex {
-      pos: v.pos.clone(),
-      norm: v.norm.clone()
-    }
+fn from(v: &Vertex) -> GfxVertex {
+  GfxVertex {
+    pos: v.pos.clone(),
+    norm: v.norm.clone()
   }
 }
 
@@ -91,6 +94,10 @@ impl From<Vertex> for GfxVertex {
 struct App<R: gfx::Resources> {
   bundle: Bundle<R, bzr::Data<R>>,
   scene: Scene
+}
+
+fn to_gfx_vtxs(vs: Vec<Vertex>) -> Vec<GfxVertex> {
+  vs.iter().map(|v| from(v)).collect()
 }
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
@@ -110,7 +117,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
     bz.read_bezier_file("fandisk.txt");
 
     let mut scene = Scene::new(Camera::default(), bz, Light::default(), Material::default());
-    let vtxs = scene.bobj.refresh();
+    let vtxs = to_gfx_vtxs(scene.bobj.refresh());
     let (vbuf, slice) = factory.create_vertex_buffer_with_slice(&vtxs, ());
     let pso = factory.create_pipeline_simple(vs.select(init.backend).unwrap(),
                                              ps.select(init.backend).unwrap(),
@@ -120,11 +127,11 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
     let data = bzr::Data {
       vbuf: vbuf,
-      ctm: scene.camera.ctm.as_ref(),
-      persp: scene.camera.persp.as_ref(),
-      eye: scene.camera.eye.to_homogeneous().as_ref(),
-      light: LightObject::from(scene.light),
-      material: MaterialObject::from(scene.material),
+      ctm: factory.create_constant_buffer(1),
+      persp: *(scene.camera.persp.as_ref()),
+      eye: *(scene.camera.eye.to_homogeneous().as_ref()),
+      light: factory.create_constant_buffer(1), // LightObject::from(scene.light),
+      material: factory.create_constant_buffer(1), // MaterialObject::from(scene.material),
       out_color: init.color,
       out_depth: init.depth
     };
@@ -138,13 +145,16 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
   fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
     self.scene.camera.refresh_mat();
     encoder.update_constant_buffer(&self.bundle.data.ctm,
-                                   self.scene.camera.ctm.as_ref());
+                                   &ProjectionObject {
+                                     ctm: *(self.scene.camera.ctm.as_ref())
+                                   });
 
     encoder.update_buffer(&self.bundle.data.vbuf,
-                          &self.scene.bobj.refresh());
+                          &to_gfx_vtxs(self.scene.bobj.refresh()),
+                          0);
 
     encoder.clear(&self.bundle.data.out_color, [1.0, 1.0, 1.0, 1.0]);
-    encoder.clear(&self.bundle.data.out_depth, 1.0);
+    encoder.clear_depth(&self.bundle.data.out_depth, 1.0);
 
     self.bundle.encode(encoder);
   }

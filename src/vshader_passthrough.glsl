@@ -2,13 +2,16 @@
 attribute vec4 a_position;
 attribute vec4 a_norm;
 
-uniform mat4 u_ctm;
 uniform mat4 u_persp;
 
 varying vec4 v_eye;
 varying vec4 v_lgh;
 varying vec4 n_unnormalized;
 varying vec4 v_pos;
+
+uniform u_prj {
+  mat4 ctm;
+};
 
 uniform u_light {
   vec4 ambient;
@@ -19,7 +22,7 @@ uniform u_light {
 
 void main()
 {
-  gl_Position = u_persp * u_ctm * a_position;
+  gl_Position = u_persp * u_prj.ctm * a_position;
 
   n_unnormalized = a_norm;
   v_eye = u_eye - a_position;
