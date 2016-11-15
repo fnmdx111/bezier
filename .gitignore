@@ -1,6 +1,6 @@
 target
 Cargo.lock
-*.txt
+# *.txt
 .idea
 *.bk
 

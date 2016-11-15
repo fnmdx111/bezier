@@ -93,9 +93,7 @@ struct App<R: gfx::Resources> {
   scene: Scene
 }
 
-use gfx::Resources;
-
-impl<R> gfx_app::Application<R> for App<R> where R: gfx::Resources {
+impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
   fn new<F: gfx::Factory<R>>(mut factory: F, init: gfx_app::Init<R>) -> Self {
     use gfx::traits::FactoryExt;
 
